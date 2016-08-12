@@ -10,24 +10,26 @@ import (
 	"time"
 
 	"git.apache.org/thrift.git/lib/go/thrift"
+	"github.com/kataras/iris"
 )
 
 const (
-	NetworkAddr = "11.12.112.207:5800"
+	NetworkAddr = "11.12.112.87:5800"
 )
 
 var idNum int
 
+var idSeed int64
+
 type IdService struct {
-	idSeed int64
 }
 
 func (this *IdService) GetId(logIndex int64, caller string, ext string) (r *thrift_datatype.ResLong, err error) {
 	fmt.Println("GetId")
 
 	curTime := time.Now().Unix()
-	this.idSeed++
-	id := (curTime << 22) + (int64)(idNum << 10) + this.idSeed % 4096
+	idSeed++
+	id := (curTime << 22) + (int64)(idNum<<10) + idSeed%4096
 
 	return &thrift_datatype.ResLong{200, id, ""}, nil
 }
@@ -35,6 +37,27 @@ func (this *IdService) GetId(logIndex int64, caller string, ext string) (r *thri
 func (this *IdService) Echo(logIndex int64, caller string, srcStr string, ext string) (r *thrift_datatype.ResStr, err error) {
 	fmt.Println("echo success!")
 	return &thrift_datatype.ResStr{200, srcStr, ""}, err
+}
+
+type IdAPI struct {
+	*iris.Context
+}
+
+//GET /id
+func (idApi IdAPI) Get() {
+
+	curTime := time.Now().Unix()
+	idSeed++
+	id := (curTime << 22) + (int64)(idNum<<10) + idSeed%4096
+
+	fmt.Println("get id ", id)
+
+	idApi.Write(strconv.FormatInt(id, 10))
+}
+
+func startListen() {
+	iris.API("/getid", IdAPI{})
+	iris.Listen(":8080")
 }
 
 func main() {
@@ -70,5 +93,8 @@ func main() {
 	server := thrift.NewTSimpleServer4(processor, serverTransport, transportFactory, protocloFactory)
 	fmt.Println("idgo start success!")
 	fmt.Println("thrift server in", NetworkAddr)
+
+	go startListen()
+
 	server.Serve()
 }
